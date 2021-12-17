@@ -1,0 +1,210 @@
+---
+title: "DMBA data cleaning"
+author: "Joshua"
+date: "5/2/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r cars}
+library(tidyverse)
+dat<-read.csv("/Users/joonghochoi/Desktop/hackathon_scouting.csv")
+date<-dat$game_date
+a<-which(substr(date,1,4)=="2019")
+b<-which(substr(date,1,4)=="2020")
+c<-union(a,b)
+```
+#Now has filtered 2019 and 2020 data with only relevant columns.
+#Now convert categorical to numerical
+
+
+#Neural Network
+```{r}
+dat7 <-subset(dat,select= -c(Clock,Player,Player.2,Home.Team.Goals,Away.Team.Goals,Detail.1,Detail.2,Detail.3,Detail.4))
+dat8<-dat7[c,]
+dat9<-subset(dat8,select= -c(game_date,X.Coordinate.2,Y.Coordinate.2))
+unique(dat9$Event)
+k<-c("Play","Shot","Goal")
+dat10<-dat9%>%filter(Event %in% k)
+dat11<-dat10
+dat11$Event[dat11$Event=="Play"]<-0
+dat11$Event[dat11$Event=="Shot"]<-1
+dat11$Event[dat11$Event=="Goal"]<-2
+dat12 <- dat11[dat11$Event !=0,]
+dat13 <- fastDummies::dummy_cols(dat12)
+```
+
+```{r}
+dat14<-dat13
+dat14$y="meow"
+dat14[which(dat14$Event==1),]$y="Shot"
+dat14[which(dat14$Event==2),]$y="Goal"
+dat14$y<-as.factor(dat14$y)
+view(dat14)
+```
+
+```{r}
+tr_rows = sample(row.names(dat14),dim(dat14)[1]*0.1)
+ts_rows = setdiff(row.names(dat14),tr_rows)
+hockey_tr = dat14[tr_rows,]
+hockey_ts = dat14[ts_rows,]
+```
+
+```{r}
+library(caret)
+ctrl = trainControl(method="cv",      # simple cross-validation
+                    number = 10,      # 10 folds
+                    classProbs=TRUE  # this should be included so that the 
+                    #    algorithm will store predicted probabilities 
+                    #     for later generating ROC plot.
+)
+```
+
+```{r}
+set.seed(100)
+nnetFit = train( y ~ X.Coordinate + Y.Coordinate + Period + Home.Team.Skaters + Away.Team.Skaters, data=hockey_tr, 
+                 method = "nnet",   
+                 tuneGrid=expand.grid(decay = c(0, 0.05, 0.1, 1, 2), size = c(1:5, 10)),
+                 #tuneLength=5,
+                 preProc = c("center","scale"),  # Center and scale data
+                 metric ="ROC",
+                 trControl = ctrl)
+```
+
+```{r}
+nnetFit$finalModel
+plot(nnetFit)
+```
+
+```{r}
+testNNET = predict(nnetFit, newdata = hockey_ts)
+testNNETProb = predict(nnetFit, newdata= hockey_ts, type = "prob")
+trainNNET= predict(nnetFit, newdata = hockey_tr)
+```
+
+```{r}
+confusionMatrix(data = testNNET, hockey_ts$y)
+confusionMatrix(data = testNNET, hockey_ts$y)$overall[1]
+confusionMatrix(data = trainNNET,hockey_tr$y)$overall[1]
+```
+#KNN
+```{r}
+dat16<-fastDummies::dummy_cols(dat11)
+dat17<-dat16
+dat17$y="meow"
+dat17[which(dat17$Event==0),]$y="Play"
+dat17[which(dat17$Event==1),]$y="Shot"
+dat17[which(dat17$Event==2),]$y="Goal"
+dat17$y<-as.factor(dat17$y)
+view(dat17)
+```
+
+```{r}
+tr2_rows = sample(row.names(dat17),dim(dat17)[1]*0.3)
+ts2_rows = setdiff(row.names(dat17),tr2_rows)
+hockey_tr2 = dat17[tr2_rows,]
+hockey_ts2 = dat17[ts2_rows,]
+```
+
+```{r}
+set.seed(100)
+
+knn_hockey <- train(y ~ X.Coordinate + Y.Coordinate + Period + Home.Team.Skaters + Away.Team.Skaters, data=hockey_tr2, 
+                   method = "knn",
+                   preProcess = c("center", "scale"), 
+                   tuneGrid=expand.grid(k=1:20),
+                   trControl = trainControl(method = "cv", number=5))
+```
+
+```{r}
+plot(knn_hockey)
+knn_hockey
+```
+
+```{r}
+testknn = predict(knn_hockey, newdata = hockey_ts2)
+testknnProb = predict(knn_hockey, newdata= hockey_ts2, type = "prob")
+trainknn= predict(knn_hockey, newdata = hockey_tr2)
+```
+
+```{r}
+confusionMatrix(data = testknn, hockey_ts2$y)
+```
+
+
+#Old SVM
+
+results2<-results1
+results2$y="meow"
+results2[which(results2$Event==0),]$y="Play"
+results2[which(results2$Event==1),]$y="Shot"
+results2[which(results2$Event==2),]$y="Goal"
+results2$y<-as.factor(results2$y)
+results2[results2$y !="Play",]
+view(results2)
+
+partition data in training (60%) and test data (40%)
+set.seed(100)
+tr_rows = sample(row.names(results2),dim(results2)[1]*0.6)
+ts_rows = setdiff(row.names(results2),tr_rows)
+hockey_tr = results2[tr_rows,]
+hockey_ts = results2[ts_rows,]
+
+
+setting the resampling method
+ctrl = trainControl(method="cv",      # simple cross-validation
+                    number = 10,      # 10 folds
+                    classProbs=TRUE  # this should be included so that the 
+                    #    algorithm will store predicted probabilities 
+                    #     for later generating ROC plot.
+                    )
+
+
+######################## SVM Linear ##########
+training svm model - Linear kernel
+set.seed(100)
+svmFit = train(y ~ ., data=hockey_tr, 
+               method="svmLinear",   # linear kernel
+               tuneGrid=expand.grid(C = c(0.01,0.1,1,10,100)),
+               preProc=c("center","scale"),  # Center and scale data
+               trControl=ctrl)
+
+svmFit$finalModel
+plot(svmFit)
+
+testlinearSVM = predict(svmFit, newdata=hockey_ts)
+testlinearSVMProb = predict(svmFit, newdata=hockey_ts, type="prob")
+
+confusionMatrix(data=testlinearSVM, hockey_ts$y)
+
+#need to find better summary function. Cannot use twoClassSummary
+
+#ignore codes below.
+
+
+ctrl = trainControl(method="cv",      # simple cross-validation
+                    number = 10,      # 10 folds
+                    summaryFunction=twoClassSummary,	# Use AUC to pick the best model
+                    classProbs=TRUE  # this should be included so that the 
+                    #    algorithm will store predicted probabilities 
+                    #     for later generating ROC plot.
+                    )
+                    
+
+
+results2$y<-as.factor(results2$y)
+
+results2[which(results2$Event==0),]$y="Play"
+
+results2[which(results2$Event==0),]$y=as.factor("Play")
+results2[which(results2$Event==1),]$y=as.factor("Shot")
+results2[which(results2$Event==2),]$y=as.factor("Goal")
+results2<-results2[complete.cases(results2),]
+
+

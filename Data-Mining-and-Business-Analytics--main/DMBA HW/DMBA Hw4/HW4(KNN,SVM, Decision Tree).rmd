@@ -1,0 +1,158 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+Step 0
+```{r}
+library("caret")
+library("pROC")
+library("kernlab")
+credit_data <- read.csv("credit_data.csv", stringsAsFactors = TRUE)
+credit_data$credit_history <- ordered(credit_data$credit_history,
+                                      levels = c("critical", "poor", "good","very good","perfect"))
+credit_data$employment_duration <- 
+  ordered(credit_data$employment_duration,
+  levels = c("unemployed" , "< 1 year", "1 - 4 years", "4 - 7 years","> 7 years"))
+
+```
+Step 1
+
+KNN
+```{r}
+set.seed(100)
+
+knn_credit <- train(default ~ ., data=credit_data, 
+                   method = "knn",
+                   preProcess = c("center", "scale"), 
+                   tuneGrid=expand.grid(k=1:50),
+                   trControl = trainControl(method = "cv", number=10))
+
+pred_knn <- predict(knn_credit, newdata = credit_data)
+confusionMatrix(data = pred_knn, credit_data$default)
+```
+SVM linear
+```{r}
+set.seed(23)
+
+svm_credit = train(default ~ ., data=credit_data, 
+               method="svmLinear",
+               tuneGrid=expand.grid(C = c(0.01,0.1,1,10)),
+               preProcess=c("center","scale"),
+               trControl= trainControl(method = "cv", number=10, classProbs = TRUE))
+
+pred_svm <-predict(svm_credit, newdata = credit_data)
+confusionMatrix(data = pred_svm, credit_data$default)
+```
+Decision tree
+```{r}
+set.seed(100)
+
+C5.0_credit <- train(default ~ ., data=credit_data,
+                     method = "C5.0",
+                     preProcess = c("center", "scale"),
+                     tuneGrid = expand.grid( .winnow = c(TRUE,FALSE), .trials=1, .model="tree"),
+                     trControl = trainControl(method = "cv", number=10))
+
+pred_tree <- predict(C5.0_credit, newdata = credit_data)
+confusionMatrix(data = pred_tree, credit_data$default)
+```
+Step 2
+
+KNN
+```{r}
+pred_probs_knn <-predict(knn_credit, credit_data, type = "prob")
+knnROC <- roc(credit_data$default, 
+              pred_probs_knn[,"yes"],
+              levels = c('no','yes'),
+              direction ='<')
+```
+SVM linear
+```{r}
+pred_probs_svm <-predict(svm_credit, credit_data, type = "prob")
+svmLinearROC = roc(predictor=pred_probs_svm$yes,
+                   response=credit_data$default,
+                   levels=levels(credit_data$default),
+                   direction = "<")
+```
+Decision tree
+```{r}
+pred_probs_tree <- predict(C5.0_credit, credit_data, type = "prob")
+treeROC <- roc(credit_data$default, pred_probs_tree[, "yes"],
+                levels = c('no','yes'),
+                direction = '<')
+```
+ROC plots
+```{r}
+plot(treeROC, col="red")
+plot(svmLinearROC, add=TRUE, col="blue")
+plot(knnROC, add=TRUE, col="green")
+```
+Step 3
+
+KNN auc
+```{r}
+auc(knnROC)
+```
+SVM linear auc
+```{r}
+auc(svmLinearROC)
+```
+Decision tree auc
+```{r}
+auc(treeROC)
+```
+We would choose the decision tree algorithm because it has the highest AUC (.865)
+
+Step 4
+```{r}
+new_customers_data <- read.csv("new_customers.csv", stringsAsFactors = TRUE)
+new_customers_data$credit_history <- ordered(new_customers_data$credit_history,
+                                      levels = c("critical", "poor", "good","very good","perfect"))
+new_customers_data$employment_duration <- 
+  ordered(new_customers_data$employment_duration,
+  levels = c("unemployed" , "< 1 year", "1 - 4 years", "4 - 7 years","> 7 years"))
+```
+KNN
+```{r}
+pred_knn_new_customers <-predict(knn_credit, newdata = new_customers_data)
+pred_knn_new_customers
+```
+SVM linear
+```{r}
+pred_svm_new_customers <-predict(svm_credit, newdata = new_customers_data)
+pred_svm_new_customers
+```
+Decision tree
+```{r}
+pred_decision_tree_new_customers <-predict(C5.0_credit, newdata = new_customers_data)
+pred_decision_tree_new_customers
+```
+According to majority rule, the following prediction would be made for the five
+customers in the new customers dataset: yes no yes no no (in order of customers listed
+in the new customers dataset)
+
+Step 5
+
+Calculating individual accuracies via confusion matrix
+
+KNN
+```{r}
+confusionMatrix(data = pred_knn_new_customers, new_customers_data$default)
+```
+SVM linear
+```{r}
+confusionMatrix(data = pred_svm_new_customers, new_customers_data$default)
+```
+Decision Tree
+```{r}
+confusionMatrix(data = pred_decision_tree_new_customers, new_customers_data$default)
+```
+Calculating accuracy for majority rule manually
+
+Majority value predictions in order listed (predictions in brackets are correct):
+[yes] [no] [yes] [no] [no]
+Majority rule accuracy = 5/5 = 100%
+The majority rule accuracy of 100% is greater than the individual accuracy of the algorithms 
+which are all equal to 80%
+
