@@ -5,6 +5,8 @@ Codes/Projects from sophmore year at CMU
 
 -Data mining: R techniques+machine learning
 
+-SUDS(Students using Data for Social Good): Project management, Microsoft Powerapps
+
 -Big data competition+Tartan analytic: R for sport analytic(hockey) visualization+ ML
 
 -Zombox: Unity for game project
