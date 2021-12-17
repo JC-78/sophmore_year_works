@@ -1,0 +1,234 @@
+---
+title: "Hockey Big Data Competition"
+author: "Joshua"
+date: "2/4/2021"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r wrap-hook,echo=FALSE}
+library(knitr)
+#tinytex::install_tinytex()
+
+hook_output = knit_hooks$get('output')
+knit_hooks$set(output = function(x, options) {
+  # this hook is used only when the linewidth option is not NULL
+  if (!is.null(n <- options$linewidth)) {
+    x = knitr:::split_lines(x)
+    # any lines wider than n should be wrapped
+    if (any(nchar(x) > n)) x = strwrap(x, width = n)
+    x = paste(x, collapse = '\n')
+  }
+  hook_output(x, options)
+})
+```
+
+```{r setup, include=FALSE}
+
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidyverse)
+library(lubridate)
+library(ggthemes)
+library(knitr)
+library(gridExtra)
+
+```
+
+```{r cars}
+data <- read.csv("https://raw.githubusercontent.com/bigdatacup/Big-Data-Cup-2021/main/hackathon_scouting.csv",stringsAsFactors = FALSE)
+
+View(data)
+
+```
+
+```{r}
+Wdata <- read.csv("https://raw.githubusercontent.com/bigdatacup/Big-Data-Cup-2021/main/hackathon_womens.csv",stringsAsFactors = FALSE)
+
+View(Wdata)
+```
+
+```{r} 
+dim(data) #75873 rows  21 columns
+dim(Wdata) #24002 rows   21 columns 
+#The only difference is the gender. 
+```
+
+Testing an assumption
+```{r}
+#commented out for now, as it causes some knitting problems
+#u <-unique(data["Home.Team"])
+#v <- unique(data["Away.Team"])
+#length(u)==length(v)
+#length(setdiff(u,v))
+#length(setdiff(v,u))
+#length(intersect(u,v))==length(u) False. 
+```
+^Finding:Not all the teams in Home.Team are in Away.Team. 
+
+
+Ideas after examining the datasets:
+Q.How do players' performances vary? 
+
+```{r}
+length(unique(data$Player))
+```
+#so not a good idea.
+
+Q.Making clusters and identifying successful clusters and clusters that need improvements?
+A:No, the datas are already classified so no need to use clustering algorithms. 
+
+Analyze shot: Shot attempts that are unsuccessful (block, miss or save)
+Analyze goal: Shot attempts that are successful (goal)
+Analyze play: Pass attempts that are successful
+
+Which skills get affected the most and least between these two types of matches(Home and away)?
+
+How does it vary between two genders? 
+
+The rest above sound good. I will proceed on. I need to simplify/clean the dataset first.
+
+
+Simplifying dataset: #2nd x-coord, 2nd y-coord. Many of them are NA
+```{r}
+#Collecting 2020 data only
+teams <- group_by(data,Home.Team)
+
+shots <- teams %>% filter(Event=="Shot") 
+shots$date <- as.Date(shots$game_date,format= "%Y-%m-%d")
+shots <- subset(shots,game_date>"2020-01-01" & game_date<"2021-01-01")
+shots
+nrow(shots) #2303
+
+goal <- teams %>% filter(Event=="Goal") 
+goal$date <- as.Date(goal$game_date,format= "%Y-%m-%d")
+goal <- subset(goal,game_date>"2020-01-01" & game_date<"2021-01-01")
+goal
+nrow(goal) #132
+
+
+pass <- teams %>% filter(Event=="Play") 
+pass$date<- as.Date(pass$game_date,format= "%Y-%m-%d")
+pass <- subset(pass,game_date>"2020-01-01" & game_date<"2021-01-01")
+pass
+nrow(pass) #11303
+
+```
+
+-Analyzing shots made in 2020-
+```{r}
+table(shots$Detail.2)
+shots1 <- shots %>% filter(Period=="1")
+shots2 <- shots %>% filter(Period=="2")
+shots3 <- shots %>% filter(Period=="3")
+
+table(shots1$Detail.2)
+table(shots2$Detail.2)
+table(shots3$Detail.2)
+
+```
+
+Observation: 
+1)The count of On Net generally increases over the period
+2) The count of missed spiked during 2nd period but not by significant margin
+3) The count of blocked is lowest in 2nd period and highest in 3rd period, but the difference is not significant.
+4)On Net is the shot type with the highest count; blocked is the shot type with the lowest count.
+
+Suggestion: 
+1) Work on the precision training in order to reduce the shot on Net. 
+
+
+```{r}
+shots1 <- shots %>% filter(Period=="1") 
+ggplot(shots1,aes(x=X.Coordinate,y=Y.Coordinate,col=factor(Detail.2)))+ggtitle("Shot Type Visualizations for Different Teams during Period 1")+geom_point()+facet_wrap(~Home.Team)
+```
+
+```{r}
+shots2 <- shots %>% filter(Period=="2") 
+ggplot(shots2,aes(x=X.Coordinate,y=Y.Coordinate,col=factor(Detail.2)))+ggtitle("Shot Type Visualizations for Different Teams during Period 2")+geom_point()+facet_wrap(~Home.Team)
+```
+
+```{r}
+shots3 <- shots %>% filter(Period=="3") 
+ggplot(shots3,aes(x=X.Coordinate,y=Y.Coordinate,col=factor(Detail.2)))+ggtitle("Shot Type Visualizations for Different Teams during Period 3")+geom_point()+facet_wrap(~Home.Team)
+```
+
+
+-Analyzing goals made in 2020-
+
+```{r}
+table(goal$Detail.1)
+
+goal1 <- goal %>% filter(Period=="1")
+goal2 <- goal %>% filter(Period=="2")
+goal3 <- goal %>% filter(Period=="3")
+
+table(goal1$Detail.1)
+table(goal2$Detail.1)
+table(goal3$Detail.1)
+
+```
+
+Observation:
+1)Snapshot takes approximately 49% of the overall goals made in 2020.
+2) Snapshot is the goal type that was of highest count, whereas wrap around is the goal type that is of the lowest count.
+
+Suggestion:
+1) Work on developing the goal skills of the 3 lowest count: wrap around, slapshot, and deflection.
+```{r}
+goal1 <- goal %>% filter(Period=="1") 
+ggplot(goal1,aes(x=X.Coordinate,y=Y.Coordinate,col=factor(Detail.1)))+ggtitle("Goal Type Visualizations for Different Teams during Period 1")+geom_point()+facet_wrap(~Home.Team)
+```
+
+```{r}
+goal2 <- goal %>% filter(Period=="2") 
+ggplot(goal2,aes(x=X.Coordinate,y=Y.Coordinate,col=factor(Detail.1)))+ggtitle("Goal Type Visualizations for Different Teams during Period 2")+geom_point()+facet_wrap(~Home.Team)
+```
+
+```{r}
+goal3 <- goal %>% filter(Period=="3") 
+ggplot(goal3,aes(x=X.Coordinate,y=Y.Coordinate,col=factor(Detail.1)))+ggtitle("Goal Type Visualizations for Different Teams during Period 3")+geom_point()+facet_wrap(~Home.Team)
+```
+
+-Analyzing pass made in 2020-
+
+```{r}
+table(pass$Detail.1)
+
+pass1 <- pass %>% filter(Period=="1")
+pass2 <- pass %>% filter(Period=="2")
+pass3 <- pass %>% filter(Period=="3")
+
+table(pass1$Detail.1)
+table(pass2$Detail.1)
+table(pass3$Detail.1)
+```
+Observation:
+1)The count of Direct passes are higher than that of indirect passes in all 3 periods.
+
+Suggestion:
+1) Dedicating more time into practicing either direct passes, which are performed more during matches, or into indirect passes to have more options when it comes to playing styles
+
+```{r}
+pass1 <- pass %>% filter(Period=="1") 
+ggplot(pass1,aes(x=X.Coordinate,y=Y.Coordinate,col=factor(Detail.1)))+ggtitle("Pass Type Visualizations for Different Teams during Period 1")+geom_point()+facet_wrap(~Home.Team)
+```
+
+```{r}
+pass2 <- pass %>% filter(Period=="2") 
+ggplot(pass2,aes(x=X.Coordinate,y=Y.Coordinate,col=factor(Detail.1)))+ggtitle("Pass Type Visualizations for Different Teams during Period 2")+geom_point()+facet_wrap(~Home.Team)
+```
+
+```{r}
+pass3 <- pass %>% filter(Period=="3") 
+ggplot(pass3,aes(x=X.Coordinate,y=Y.Coordinate,col=factor(Detail.1)))+ggtitle("Pass Type Visualizations for Different Teams during Period 3")+geom_point()+facet_wrap(~Home.Team)
+```
+
+Observation:
+1)Whereas direct passes are made from everywhere throughout all 3 periods, indirect passes generally seem to occur near the ends of the rings rather than the middle body of the ring in the 1st period. Then, over the 2nd and 3rd periods, more indirect passes begin to occur slightly more near th middle body of the ring.
+
+Suggestion: In terms of strategy, the players should watch out more for indirect passes near the middle part of the ring, particularly during period 2. Especially if the teams are ssissasuga steelhead and Guelph storm.
+

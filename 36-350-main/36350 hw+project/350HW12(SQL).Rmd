@@ -1,0 +1,325 @@
+---
+title: "HW: Week 12"
+author: "36-350 -- Statistical Computing"
+date: "Week 12 -- Spring 2021"
+output:
+  pdf_document:
+    toc: no
+  html_document:
+    toc: true
+    toc_float: true
+    theme: spacelab
+---
+
+Name: Joong Ho Choi
+
+Andrew ID: joonghoc
+
+You must submit **your own** lab as a knitted PDF file on Gradescope.
+
+This week's homework is a little different. Here you will be working with `SQL`, specifically with the variant `postgres`. You will do your work "remotely" in a `postgres` terminal and cut-and-paste your answers into plain code blocks below:
+```
+This is a plain code block. Note the lack of a {r} above.
+Try to avoid issues of text going off the page by utilizing
+line breaks.
+```
+Cut-and-paste both your input command and the output. *If the output has many rows, it is sufficient to cut-and-paste the first five, unless otherwise instructed.*
+
+<hr>
+
+## Question 1
+*(10 points)*
+
+*Notes 12A (7-11) + Notes 12B (3)*
+
+Create a table dubbed `rdata` that has five columns: `id` (type `serial primary key`), `a` and `b` (consisting of strings that should be no more than five characters), `moment` (which is a date), and `x` (which is a number that should have no more than five digits total and two to the right of the decimal point).
+```
+CREATE TABLE rdata(                                                  
+id serial primary key,                                                          
+a varchar(5),                                                                   
+b varchar(5),                                                                   
+moment date,  
+x numeric(5,2)
+);
+
+Output:
+ id | a | b | moment | x 
+----+---+---+--------+---
+(0 rows)
+
+```
+
+## Question 2
+*(10 points)*
+
+*Notes 12B (4,8)*
+
+Delete the table and create it again, with certain constraints: `a` and `b` cannot be null and must be unique; `moment` should have a default value of `2020-01-01` (); and `x` should be larger than zero.
+```
+CREATE TABLE rdata(                                                  
+id serial primary key,                                                          
+a varchar(5) unique not null,                                                   
+b varchar(5) unique not null,                                                   
+moment date default '2020-01-01',                                               
+x numeric(5,2),                                                
+check (x>0)                                                              
+);
+```
+
+Output:
+ id | a | b | moment | x 
+ 
+----+---+---+--------+---
+
+(0 rows)
+
+# select * from rdata;    <--to see output(for my personal reference)
+
+
+## Question 3
+*(10 points)*
+
+*Notes 12A (4)*
+
+Use `\d` in combination with the name of your table to display its properties. Copy and paste all output here.
+```
+\d rdata;
+
+
+                                  Table "public.rdata"
+ Column |         Type         | Collation | Nullable |              Default              
+--------+----------------------+-----------+----------+-----------------------------------
+ id     | integer              |           | not null | nextval('rdata_id_seq'::regclass)
+ a      | character varying(5) |           | not null | 
+ b      | character varying(5) |           | not null | 
+ moment | date                 |           |          | '2020-01-01'::date
+ x      | numeric(5,2)         |           |          | 
+Indexes:
+    "rdata_pkey" PRIMARY KEY, btree (id)
+    "rdata_a_key" UNIQUE CONSTRAINT, btree (a)
+    "rdata_b_key" UNIQUE CONSTRAINT, btree (b)
+Check constraints:
+    "rdata_x_check" CHECK (x > 0::numeric)
+```
+
+## Question 4
+*(10 points)*
+
+*Notes 12B (5)*
+
+Insert three rows of data into your table. Do this without explicity referring to the column `id` or `moment`. Display your table using the command `select * from rdata`. You should see a default date in your `moment` column!
+```
+insert into rdata (a,b,x)values                                             
+('meow','roar',12.00),                                           
+('woof','rar',13.00),                                            
+('roar','krr',14.00);
+```
+
+ id |  a   |  b   |   moment   |   x   
+----+------+------+------------+-------
+  1 | meow | roar | 2020-01-01 | 12.00
+  2 | woof | rar  | 2020-01-01 | 13.00
+  3 | roar | krr  | 2020-01-01 | 14.00
+(3 rows)
+
+
+## Question 5
+*(10 points)*
+
+*Notes 12B (5)*
+
+Attempt to add another row of data with a negative value for `x`. Show what happens. (If the row is added...that's bad. It means you don't have the constraint `x` > 0 defined.) Afterwords, add a valid row of data, and show the table. Is there anything weird?
+```
+insert into rdata values                                             
+(4,'brew','bleh','2020-08-08',-12.00);
+```
+
+```
+ERROR:  new row for relation "rdata" violates check constraint "rdata_x_check1"
+DETAIL:  Failing row contains (4, brew, bleh, 2020-08-08, -12.00).
+```
+
+insert into rdata values                                             
+(4,'brew','bleh','2020-08-08',15.00);
+
+  id |  a   |  b   |   moment   |   x   
+----+------+------+------------+-------
+  1 | meow | roar | 2020-01-01 | 12.00
+  2 | woof | rar  | 2020-01-01 | 13.00
+  3 | roar | krr  | 2020-01-01 | 14.00
+  4 | brew | bleh | 2020-08-08 | 15.00
+(4 rows)
+
+
+
+Nothing is weird.
+
+## Question 6
+*(10 points)*
+
+*Notes 12B (6)*
+
+Change the table `rdata` so as to change the data in `moment` so that two of the dates are in March 2020, while the other two are not in March 2020. Use `where` as shown in the notes, and utilize a logical "or" to update two of the dates to the same date in March at the same time. Show your updated table. (Note that the rows may be rearranged. This is OK.)
+```
+update rdata                                                         
+set moment='2020-03-01'                                                         
+where id=1::integer                                                             
+or id=3::integer;
+```
+ id |  a   |  b   |   moment   |   x   
+----+------+------+------------+-------
+  2 | woof | rar  | 2020-01-01 | 13.00
+  4 | brew | bleh | 2020-08-08 | 15.00
+  1 | meow | roar | 2020-03-01 | 12.00
+  3 | roar | krr  | 2020-03-01 | 14.00
+
+## Question 7
+*(10 points)*
+
+*Notes 12B (7)*
+
+Add a new column to `rdata` dubbed `y`, and let it be of `boolean` type with default value `false`. Display your updated table.
+```
+alter table rdata
+add column y boolean default 'false';
+```
+id |  a   |  b   |   moment   |   x    | y 
+----+------+------+------------+--------+---
+  2 | woof | rar  | 2020-01-01 | 13.00 | f
+  4 | brew | bleh | 2020-08-08 | 15.00 | f
+  1 | meow | roar | 2020-03-01 | 12.00 | f
+  3 | roar | krr  | 2020-03-01 | 14.00 | f
+
+
+## Question 8
+*(10 points)*
+
+*Notes 12B (8)*
+
+Remove the row of your table with `id` value 2. Display your updated table.
+```
+delete from rdata
+where id=2;
+```
+id |  a   |  b   |   moment   |   x    | y 
+----+------+------+------------+--------+---
+  4 | brew | bleh | 2020-08-08 | 15.00 | f
+  1 | meow | roar | 2020-03-01 | 12.00 | f
+  3 | roar | krr  | 2020-03-01 | 14.00 | f
+
+## Question 9
+*(10 points)*
+
+*Notes 12B (7)*
+
+Rename the column `moment` to have the name `date`. Display your updated table.
+```
+alter table rdata
+rename column moment to date;
+```
+id |  a   |  b   |    date    |   x    | y 
+----+------+------+------------+--------+---
+  4 | brew | bleh | 2020-08-08 | 15.00 | f
+  1 | meow | roar | 2020-03-01 | 12.00 | f
+  3 | roar | krr  | 2020-03-01 | 14.00 | f
+  
+## Question 10
+*(10 points)*
+
+*Notes 12C (2-4)*
+
+Download the file `GalaxyStatistics.txt` from the `DATA` directory on `Canvas`. This file contains three columns: the sky field name, the Gini coefficient value, and the concentration statistic value for each of 8,358 observed galaxies. (Feel free to call the concentration statistic column `conc` for short.) Copy it into a `postgres` session to populate a table named `galaxies`. You should add explicit checks that ensure that `gini` and `conc` have values greater than zero. Hint: you'll have to explicitly provide a `delimiter` value here.
+```
+create table galaxies(
+name text,
+gini numeric(16,15),
+conc numeric(15,14),
+check (gini>0),
+check (conc>0));
+
+\copy galaxies from '/Users/joonghochoi/Desktop/GalaxyStatistics.txt' delimiter ' ' CSV HEADER ;
+```
+Result: COPY 8358
+Output(shows part of the table): 
+name  |       gini        |       conc       
+--------+-------------------+------------------
+ COSMOS | 0.504693664799751 | 3.57616535107618
+ COSMOS | 0.433492285980024 | 3.10393208720358
+ COSMOS | 0.287995253794197 | 2.27855628892391
+ COSMOS | 0.517034044130523 | 2.81661082728353
+ COSMOS | 0.303455775671215 | 2.45671726779084
+ COSMOS | 0.536113882926862 | 4.16546620982066
+ COSMOS | 0.414133117056746 | 3.43670277893919
+ COSMOS | 0.410450597439691 | 3.33677421879445
+ COSMOS | 0.542555452114619 | 3.69827405840860
+ COSMOS | 0.426854838166625 | 3.09427404602116
+ COSMOS | 0.466351952522434 | 2.50937685750104
+ COSMOS | 0.514834547419262 | 3.92994154337506
+ COSMOS | 0.397682737305622 | 1.76568833537357
+ COSMOS | 0.557578969862245 | 4.14091536316521
+ COSMOS | 0.456952034793859 | 2.60294337630142
+ COSMOS | 0.505596302674748 | 3.39662704068014
+ COSMOS | 0.468824654664978 | 2.73190489953117
+ COSMOS | 0.434817719526611 | 2.72551642819732
+ COSMOS | 0.458057743740875 | 2.57918811562507
+ COSMOS | 0.587685533909829 | 3.93396534865304
+ COSMOS | 0.302737033545329 | 2.38117992962356
+ COSMOS | 0.558251113315734 | 4.32476307562700
+
+
+#Personal note: select count(*) AS exact_count from galaxies;
+exact_count 
+-------------
+        8358
+
+
+## Question 11
+*(10 points)*
+
+*Notes 12B (8)*
+
+Delete all rows of the table for which the value of `gini` is less than 0.5 or the value of `conc` is greater than 3. You should find that 7,883 rows are deleted. (Show this by showing the output of your `SQL` command.)
+```
+delete from galaxies
+where gini<0.5 or
+conc>3;
+```
+DELETE 7883
+
+#For personal reference: select count(*) AS exact_count from galaxies;
+ exact_count 
+-------------
+         475
+
+
+## Question 12
+*(10 points)*
+
+*Notes 12B (6-7)*
+
+Alter the table to create a new variable `cg_rat` that is the ratio of `conc` to `gini`. Then display all the rows where the value of `cg_rat` is greater than 5.9. (This last part is accomplished by combining `select` with `where` in a way that should be hopefully becoming somewhat intuitive.) You should have nine rows of output overall.
+```
+alter table galaxies
+add column cg_rat numeric(6,3);
+
+update galaxies
+set cg_rat=conc/gini;
+
+select * from galaxies                                                                                                           
+where cg_rat>5.9;
+```
+ name  |       gini        |       conc       | cg_rat 
+--------+-------------------+------------------+--------
+ COSMOS | 0.505315816622831 | 2.98262529284670 |  5.902
+ COSMOS | 0.500590685140458 | 2.97597832910617 |  5.945
+ COSMOS | 0.503615988003510 | 2.98733488828900 |  5.932
+ EGS    | 0.500424503689410 | 2.98645170853111 |  5.968
+ COSMOS | 0.500671122036005 | 2.97465381069856 |  5.941
+ COSMOS | 0.503719930512369 | 2.97337141688731 |  5.903
+ GOODSS | 0.500338113641828 | 2.98312251852409 |  5.962
+ UDS    | 0.503803338671752 | 2.98048530133007 |  5.916
+ UDS    | 0.500305684629919 | 2.97898274914929 |  5.954
+(9 rows)
+
+
+
